@@ -23,9 +23,9 @@
   .tabs button.on{background:var(--accent);color:#111;border-color:var(--accent)}
   .group{padding:12px 14px 0;color:var(--dim);font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
   .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:8px 14px}
-  .c{position:relative;background:var(--card);border:2px solid var(--need);border-radius:12px;padding:0;color:var(--text);text-align:center;overflow:hidden;min-height:128px;display:flex;flex-direction:column}
+  .c{position:relative;background:var(--card);border:2px solid var(--need);border-radius:12px;padding:0;color:var(--text);text-align:center;overflow:hidden;display:flex;flex-direction:column}
   .c.have{border-color:var(--have)}
-  .c .img{flex:1;background:#0d0f13 center/cover no-repeat;min-height:92px;filter:grayscale(1) brightness(.45);transition:filter .2s}
+  .c .img{width:100%;aspect-ratio:5/7;background:#0d0f13 center/contain no-repeat;filter:grayscale(1) brightness(.45);transition:filter .2s}
   .c.have .img{filter:none}
   .c .meta{padding:5px 4px;font-size:11px;line-height:1.2}
   .c .meta b{display:block;color:var(--dim);font-size:11px}
