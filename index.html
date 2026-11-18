@@ -67,7 +67,8 @@
   .pro-note a{color:var(--accent);text-decoration:none}
   .sheet-loading{padding:40px 16px;text-align:center;color:var(--dim);font-size:14px}
   .sheet-error{padding:30px 16px;text-align:center;color:var(--need);font-size:13px}
-  .c .prc{position:absolute;bottom:26px;right:3px;background:rgba(14,16,19,.88);color:var(--accent);font-size:8px;font-weight:800;padding:2px 5px;border-radius:4px;z-index:1;border:1px solid rgba(255,203,5,.35);line-height:1.4;-webkit-user-select:none;user-select:none;pointer-events:all}
+  .c .meta{cursor:pointer;border-top:1px solid rgba(255,203,5,.18);background:rgba(255,203,5,.04)}
+  .c .meta .phint{color:var(--accent);font-size:8px;font-weight:800;float:right;padding-right:1px;opacity:.8}
 </style>
 </head>
 <body>
@@ -117,8 +118,7 @@ function render(){
       el.innerHTML=`<div class="img" style="background-image:url(https://images.pokemontcg.io/base1/${c.num}.png)"></div>`+
         (c.num<=16?`<span class="holo">HOLO</span>`:"")+
         `<span class="tick">${owned.has(c.num)?"✓":"✗"}</span>`+
-        `<span class="prc" role="button" aria-label="View prices">$</span>`+
-        `<div class="meta"><b>${c.num}/102</b><span>${c.n}</span></div>`;
+        `<div class="meta"><b>${c.num}/102 <span class="phint">$</span></b><span>${c.n}</span></div>`;
       grid.append(el);
     }
     main.append(grid);
@@ -129,7 +129,7 @@ function render(){
 }
 
 main.addEventListener("click",e=>{
-  if(e.target.closest(".prc")){openPricing(+e.target.closest(".c").dataset.n);return;}
+  if(e.target.closest(".meta")){openPricing(+e.target.closest(".c").dataset.n);return;}
   const el=e.target.closest(".c");if(!el)return;
   const n=+el.dataset.n;
   owned.has(n)?owned.delete(n):owned.add(n);
