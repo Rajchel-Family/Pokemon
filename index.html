@@ -63,8 +63,6 @@
   .graded-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px}
   .graded-row.last{grid-template-columns:repeat(2,1fr)}
   .price-cell.grade .label{color:var(--accent)}
-  .pro-note{background:#14161c;border-radius:10px;padding:12px;text-align:center;color:var(--dim);font-size:12px;line-height:1.5}
-  .pro-note a{color:var(--accent);text-decoration:none}
   .sheet-loading{padding:40px 16px;text-align:center;color:var(--dim);font-size:14px}
   .sheet-error{padding:30px 16px;text-align:center;color:var(--need);font-size:13px}
   .c .meta{cursor:pointer;border-top:1px solid rgba(255,203,5,.18);background:rgba(255,203,5,.04)}
@@ -169,14 +167,13 @@ overlay.addEventListener("click",closeSheet);
 
 function fmt(v){return v!=null?"$"+v.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2}):null}
 
-function renderSheet(cardNum,prices,error){
+function renderSheet(cardNum,prices,error,psa){
   const isHolo=cardNum<=16;
   if(error){
     sheetBody.innerHTML=`<div class="sheet-error">Couldn't load prices. Try again.</div>`;
     return;
   }
-  const priceCell=(lbl,val)=>`<div class="price-cell"><div class="label">${lbl}</div><div class="amount${val==null?" nil":""}">${val!=null?fmt(val):"—"}</div></div>`;
-  const gradedCell=(lbl)=>`<div class="price-cell grade"><div class="label">${lbl}</div><div class="amount nil">—</div></div>`;
+  const priceCell=(lbl,val,grade)=>`<div class="price-cell${grade?" grade":""}"><div class="label">${lbl}</div><div class="amount${val==null?" nil":""}">${val!=null?fmt(val):"—"}</div></div>`;
   sheetBody.innerHTML=`
     <div class="sheet-head">
       <div class="sheet-img" style="background-image:url(https://images.pokemontcg.io/base1/${cardNum}.png)"></div>
@@ -195,14 +192,13 @@ function renderSheet(cardNum,prices,error){
       </div>
     </div>
     <div class="sheet-section">
-      <h3>Graded (PSA)</h3>
+      <h3>Graded (PSA · eBay)</h3>
       <div class="graded-row">
-        ${gradedCell("PSA 10")}${gradedCell("PSA 9")}${gradedCell("PSA 8")}
+        ${priceCell("PSA 10",psa?.psa10??null,true)}${priceCell("PSA 9",psa?.psa9??null,true)}${priceCell("PSA 8",psa?.psa8??null,true)}
       </div>
       <div class="graded-row last">
-        ${gradedCell("PSA 7")}${gradedCell("PSA 6")}
+        ${priceCell("PSA 7",psa?.psa7??null,true)}${priceCell("PSA 6",psa?.psa6??null,true)}
       </div>
-      <div class="pro-note">PSA graded prices require a <a href="https://pkmnprices.com/pricing" target="_blank">Pro plan</a> on pkmnprices</div>
     </div>`;
 }
 
@@ -210,14 +206,14 @@ async function openPricing(cardNum){
   if(navigator.vibrate)navigator.vibrate(12);
   overlay.classList.add("show");
   sheet.classList.add("show");
-  if(priceCache[cardNum]){renderSheet(cardNum,priceCache[cardNum]);return;}
+  if(priceCache[cardNum]){const c=priceCache[cardNum];renderSheet(cardNum,c.prices,false,c.psa);return;}
   sheetBody.innerHTML=`<div class="sheet-loading">Loading prices…</div>`;
   try{
     const r=await fetch(`/.netlify/functions/card-prices?num=${cardNum}`);
     if(!r.ok)throw new Error(r.status);
     const d=await r.json();
-    priceCache[cardNum]=d.prices;
-    renderSheet(cardNum,d.prices);
+    priceCache[cardNum]={prices:d.prices,psa:d.psa};
+    renderSheet(cardNum,d.prices,false,d.psa);
   }catch(e){
     renderSheet(cardNum,null,true);
   }
