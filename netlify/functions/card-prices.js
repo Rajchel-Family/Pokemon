@@ -86,7 +86,7 @@ exports.handler = async (event) => {
     return {
       statusCode: 200,
       headers: { "Content-Type": "application/json", "Cache-Control": "max-age=3600" },
-      body: JSON.stringify({ prices, psa }),
+      body: JSON.stringify({ prices, psa, _d: { keySet: !!pokepriceKey } }),
     };
   } catch (e) {
     return { statusCode: 500, body: JSON.stringify({ error: "upstream error" }) };
