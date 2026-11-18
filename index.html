@@ -41,6 +41,34 @@
   @media (min-width:800px){.grid{grid-template-columns:repeat(8,1fr)}}
   footer{padding:18px 14px calc(24px + env(safe-area-inset-bottom));text-align:center}
   footer button{background:none;border:1px solid var(--line);color:var(--dim);border-radius:10px;padding:8px 12px;font-size:12px;margin:0 4px}
+  /* Pricing sheet */
+  .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10;-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px)}
+  .overlay.show{display:block}
+  .sheet{position:fixed;left:0;right:0;bottom:0;z-index:11;background:#1e222b;border-radius:20px 20px 0 0;padding-bottom:calc(24px + env(safe-area-inset-bottom));transform:translateY(100%);transition:transform .3s cubic-bezier(.32,0,.15,1);max-height:88vh;overflow-y:auto;will-change:transform}
+  .sheet.show{transform:translateY(0)}
+  .sheet-handle{width:36px;height:4px;border-radius:2px;background:var(--line);margin:12px auto 4px}
+  .sheet-head{display:flex;gap:12px;align-items:flex-start;padding:10px 16px 14px}
+  .sheet-img{width:72px;height:100px;border-radius:8px;background:#0d0f13 center/contain no-repeat;flex-shrink:0;border:1px solid var(--line)}
+  .sheet-info{flex:1;min-width:0;padding-top:4px}
+  .sheet-info h2{font-size:17px;font-weight:700;margin:0 0 2px}
+  .sheet-info p{font-size:12px;color:var(--dim);margin:0 0 6px}
+  .sheet-badge{display:inline-block;background:var(--accent);color:#111;font-size:9px;font-weight:800;padding:2px 5px;border-radius:4px;text-transform:uppercase;letter-spacing:.04em}
+  .sheet-section{padding:0 16px 16px}
+  .sheet-section h3{font-size:11px;font-weight:700;color:var(--dim);letter-spacing:.08em;text-transform:uppercase;margin:0 0 10px;border-top:1px solid var(--line);padding-top:14px}
+  .price-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .price-cell{background:#14161c;border-radius:10px;padding:10px 6px;text-align:center}
+  .price-cell .label{font-size:10px;color:var(--dim);font-weight:600;margin-bottom:4px}
+  .price-cell .amount{font-size:16px;font-weight:700;color:var(--text)}
+  .price-cell .amount.nil{color:var(--line);font-size:13px}
+  .graded-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:8px}
+  .graded-row.last{grid-template-columns:repeat(2,1fr)}
+  .price-cell.grade .label{color:var(--accent)}
+  .pro-note{background:#14161c;border-radius:10px;padding:12px;text-align:center;color:var(--dim);font-size:12px;line-height:1.5}
+  .pro-note a{color:var(--accent);text-decoration:none}
+  .sheet-loading{padding:40px 16px;text-align:center;color:var(--dim);font-size:14px}
+  .sheet-error{padding:30px 16px;text-align:center;color:var(--need);font-size:13px}
+  .c .meta{cursor:pointer;border-top:1px solid rgba(255,203,5,.18);background:rgba(255,203,5,.04)}
+  .c .meta .phint{color:var(--accent);font-size:8px;font-weight:800;float:right;padding-right:1px;opacity:.8}
 </style>
 </head>
 <body>
@@ -53,6 +81,11 @@
     <button data-f="have">Have</button>
   </div>
 </header>
+<div class="overlay" id="overlay"></div>
+<div class="sheet" id="sheet">
+  <div class="sheet-handle"></div>
+  <div id="sheet-body"></div>
+</div>
 <main id="main"></main>
 <footer>
   <button id="exp">Copy need-list</button>
@@ -85,7 +118,7 @@ function render(){
       el.innerHTML=`<div class="img" style="background-image:url(https://images.pokemontcg.io/base1/${c.num}.png)"></div>`+
         (c.num<=16?`<span class="holo">HOLO</span>`:"")+
         `<span class="tick">${owned.has(c.num)?"✓":"✗"}</span>`+
-        `<div class="meta"><b>${c.num}/102</b><span>${c.n}</span></div>`;
+        `<div class="meta"><b>${c.num}/102 <span class="phint">$</span></b><span>${c.n}</span></div>`;
       grid.append(el);
     }
     main.append(grid);
@@ -96,6 +129,7 @@ function render(){
 }
 
 main.addEventListener("click",e=>{
+  if(e.target.closest(".meta")){openPricing(+e.target.closest(".c").dataset.n);return;}
   const el=e.target.closest(".c");if(!el)return;
   const n=+el.dataset.n;
   owned.has(n)?owned.delete(n):owned.add(n);
@@ -121,6 +155,74 @@ document.getElementById("exp").onclick=async()=>{
 document.getElementById("rst").onclick=()=>{
   if(confirm("Clear all cards you've marked as owned?")){owned.clear();save();render()}
 };
+// ── Pricing sheet ──────────────────────────────────────────────
+const overlay=document.getElementById("overlay");
+const sheet=document.getElementById("sheet");
+const sheetBody=document.getElementById("sheet-body");
+const priceCache={};
+
+function closeSheet(){
+  sheet.classList.remove("show");
+  overlay.classList.remove("show");
+}
+overlay.addEventListener("click",closeSheet);
+
+function fmt(v){return v!=null?"$"+v.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2}):null}
+
+function renderSheet(cardNum,prices,error){
+  const isHolo=cardNum<=16;
+  if(error){
+    sheetBody.innerHTML=`<div class="sheet-error">Couldn't load prices. Try again.</div>`;
+    return;
+  }
+  const priceCell=(lbl,val)=>`<div class="price-cell"><div class="label">${lbl}</div><div class="amount${val==null?" nil":""}">${val!=null?fmt(val):"—"}</div></div>`;
+  const gradedCell=(lbl)=>`<div class="price-cell grade"><div class="label">${lbl}</div><div class="amount nil">—</div></div>`;
+  sheetBody.innerHTML=`
+    <div class="sheet-head">
+      <div class="sheet-img" style="background-image:url(https://images.pokemontcg.io/base1/${cardNum}.png)"></div>
+      <div class="sheet-info">
+        <h2>${NAMES[cardNum-1]}</h2>
+        <p>${cardNum}/102 · Base Set${isHolo?" · Holo Rare":""}</p>
+        ${isHolo?'<span class="sheet-badge">Holographic</span>':""}
+      </div>
+    </div>
+    <div class="sheet-section">
+      <h3>Raw Prices (TCGPlayer)</h3>
+      <div class="price-row">
+        ${priceCell("NM",prices?.nm??null)}
+        ${priceCell("LP",prices?.lp??null)}
+        ${priceCell("MP",prices?.mp??null)}
+      </div>
+    </div>
+    <div class="sheet-section">
+      <h3>Graded (PSA)</h3>
+      <div class="graded-row">
+        ${gradedCell("PSA 10")}${gradedCell("PSA 9")}${gradedCell("PSA 8")}
+      </div>
+      <div class="graded-row last">
+        ${gradedCell("PSA 7")}${gradedCell("PSA 6")}
+      </div>
+      <div class="pro-note">PSA graded prices require a <a href="https://pkmnprices.com/pricing" target="_blank">Pro plan</a> on pkmnprices</div>
+    </div>`;
+}
+
+async function openPricing(cardNum){
+  if(navigator.vibrate)navigator.vibrate(12);
+  overlay.classList.add("show");
+  sheet.classList.add("show");
+  if(priceCache[cardNum]){renderSheet(cardNum,priceCache[cardNum]);return;}
+  sheetBody.innerHTML=`<div class="sheet-loading">Loading prices…</div>`;
+  try{
+    const r=await fetch(`/.netlify/functions/card-prices?num=${cardNum}`);
+    if(!r.ok)throw new Error(r.status);
+    const d=await r.json();
+    priceCache[cardNum]=d.prices;
+    renderSheet(cardNum,d.prices);
+  }catch(e){
+    renderSheet(cardNum,null,true);
+  }
+}
+
 render();
 </script>
 </body>
