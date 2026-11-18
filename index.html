@@ -67,6 +67,7 @@
   .pro-note a{color:var(--accent);text-decoration:none}
   .sheet-loading{padding:40px 16px;text-align:center;color:var(--dim);font-size:14px}
   .sheet-error{padding:30px 16px;text-align:center;color:var(--need);font-size:13px}
+  .c .prc{position:absolute;bottom:26px;right:3px;background:rgba(14,16,19,.88);color:var(--accent);font-size:8px;font-weight:800;padding:2px 5px;border-radius:4px;z-index:1;border:1px solid rgba(255,203,5,.35);line-height:1.4;-webkit-user-select:none;user-select:none;pointer-events:all}
 </style>
 </head>
 <body>
@@ -116,6 +117,7 @@ function render(){
       el.innerHTML=`<div class="img" style="background-image:url(https://images.pokemontcg.io/base1/${c.num}.png)"></div>`+
         (c.num<=16?`<span class="holo">HOLO</span>`:"")+
         `<span class="tick">${owned.has(c.num)?"✓":"✗"}</span>`+
+        `<span class="prc" role="button" aria-label="View prices">$</span>`+
         `<div class="meta"><b>${c.num}/102</b><span>${c.n}</span></div>`;
       grid.append(el);
     }
@@ -127,8 +129,8 @@ function render(){
 }
 
 main.addEventListener("click",e=>{
+  if(e.target.closest(".prc")){openPricing(+e.target.closest(".c").dataset.n);return;}
   const el=e.target.closest(".c");if(!el)return;
-  if(longPressed){longPressed=false;return;}
   const n=+el.dataset.n;
   owned.has(n)?owned.delete(n):owned.add(n);
   save();
@@ -154,55 +156,42 @@ document.getElementById("rst").onclick=()=>{
   if(confirm("Clear all cards you've marked as owned?")){owned.clear();save();render()}
 };
 // ── Pricing sheet ──────────────────────────────────────────────
-const PKMN_API_KEY="pk_b61d351df31cc86b7fca82097d12945093bf114daed226a5";
-const BASE_SET_ID=463;
 const overlay=document.getElementById("overlay");
 const sheet=document.getElementById("sheet");
 const sheetBody=document.getElementById("sheet-body");
-const cardIdCache={};
+const priceCache={};
 
 function closeSheet(){
   sheet.classList.remove("show");
   overlay.classList.remove("show");
 }
-
 overlay.addEventListener("click",closeSheet);
 
 function fmt(v){return v!=null?"$"+v.toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2}):null}
 
-function renderSheet(state){
-  const isHolo=state.cardNum<=16;
-  if(state.loading){
-    sheetBody.innerHTML=`<div class="sheet-loading">Loading prices…</div>`;
-    return;
-  }
-  if(state.error){
+function renderSheet(cardNum,prices,error){
+  const isHolo=cardNum<=16;
+  if(error){
     sheetBody.innerHTML=`<div class="sheet-error">Couldn't load prices. Try again.</div>`;
     return;
-  }
-  const condMap={"Near Mint":"NM","Lightly Played":"LP","Moderately Played":"MP"};
-  const rawPrices={NM:null,LP:null,MP:null};
-  for(const p of (state.prices||[])){
-    const lbl=condMap[p.condition];
-    if(lbl&&rawPrices[lbl]===null)rawPrices[lbl]=p.market_price;
   }
   const priceCell=(lbl,val)=>`<div class="price-cell"><div class="label">${lbl}</div><div class="amount${val==null?" nil":""}">${val!=null?fmt(val):"—"}</div></div>`;
   const gradedCell=(lbl)=>`<div class="price-cell grade"><div class="label">${lbl}</div><div class="amount nil">—</div></div>`;
   sheetBody.innerHTML=`
     <div class="sheet-head">
-      <div class="sheet-img" style="background-image:url(https://images.pokemontcg.io/base1/${state.cardNum}.png)"></div>
+      <div class="sheet-img" style="background-image:url(https://images.pokemontcg.io/base1/${cardNum}.png)"></div>
       <div class="sheet-info">
-        <h2>${state.cardName}</h2>
-        <p>${state.cardNum}/102 · Base Set${isHolo?" · Holo Rare":""}</p>
+        <h2>${NAMES[cardNum-1]}</h2>
+        <p>${cardNum}/102 · Base Set${isHolo?" · Holo Rare":""}</p>
         ${isHolo?'<span class="sheet-badge">Holographic</span>':""}
       </div>
     </div>
     <div class="sheet-section">
       <h3>Raw Prices (TCGPlayer)</h3>
       <div class="price-row">
-        ${priceCell("NM",rawPrices.NM)}
-        ${priceCell("LP",rawPrices.LP)}
-        ${priceCell("MP",rawPrices.MP)}
+        ${priceCell("NM",prices?.nm??null)}
+        ${priceCell("LP",prices?.lp??null)}
+        ${priceCell("MP",prices?.mp??null)}
       </div>
     </div>
     <div class="sheet-section">
@@ -218,55 +207,21 @@ function renderSheet(state){
 }
 
 async function openPricing(cardNum){
-  if(navigator.vibrate)navigator.vibrate(20);
-  sheetBody.innerHTML=`<div class="sheet-loading">Loading prices…</div>`;
+  if(navigator.vibrate)navigator.vibrate(12);
   overlay.classList.add("show");
   sheet.classList.add("show");
+  if(priceCache[cardNum]){renderSheet(cardNum,priceCache[cardNum]);return;}
+  sheetBody.innerHTML=`<div class="sheet-loading">Loading prices…</div>`;
   try{
-    let cardId=cardIdCache[cardNum];
-    if(!cardId){
-      const r=await fetch(`https://api.pkmnprices.com/v1/cards?set_id=${BASE_SET_ID}&number=${cardNum}&per_page=1`,
-        {headers:{"X-API-Key":PKMN_API_KEY}});
-      const d=await r.json();
-      if(!d.data?.length)throw new Error("not found");
-      cardId=d.data[0].id;
-      cardIdCache[cardNum]=cardId;
-    }
-    const r2=await fetch(`https://api.pkmnprices.com/v1/cards/${cardId}`,
-      {headers:{"X-API-Key":PKMN_API_KEY}});
-    const detail=await r2.json();
-    renderSheet({cardNum,cardName:NAMES[cardNum-1],prices:detail.prices});
+    const r=await fetch(`/.netlify/functions/card-prices?num=${cardNum}`);
+    if(!r.ok)throw new Error(r.status);
+    const d=await r.json();
+    priceCache[cardNum]=d.prices;
+    renderSheet(cardNum,d.prices);
   }catch(e){
-    renderSheet({cardNum,cardName:NAMES[cardNum-1],error:true});
+    renderSheet(cardNum,null,true);
   }
 }
-
-// Long-press detection
-let pressTimer=null;
-let longPressed=false;
-const LONG_MS=500;
-
-function onTouchStart(e){
-  const el=e.target.closest(".c");if(!el)return;
-  longPressed=false;
-  pressTimer=setTimeout(()=>{
-    pressTimer=null;
-    longPressed=true;
-    openPricing(+el.dataset.n);
-  },LONG_MS);
-}
-function cancelPress(){
-  if(pressTimer){clearTimeout(pressTimer);pressTimer=null;}
-}
-main.addEventListener("touchstart",onTouchStart,{passive:true});
-main.addEventListener("touchend",cancelPress,{passive:true});
-main.addEventListener("touchmove",cancelPress,{passive:true});
-// Desktop: right-click / long-press context menu
-main.addEventListener("contextmenu",e=>{
-  const el=e.target.closest(".c");if(!el)return;
-  e.preventDefault();
-  openPricing(+el.dataset.n);
-});
 
 render();
 </script>
