@@ -71,19 +71,15 @@ exports.handler = async (event) => {
           `https://www.pokemonpricetracker.com/api/v2/cards?setId=${PPT_SET_ID}&search=${enc}&includeEbay=true&limit=1`,
           { "Authorization": `Bearer ${pokepriceKey}` }
         );
-        if (pptData.error) {
-          psa._error = pptData.error;
-        } else {
-          const grades = pptData.data?.[0]?.ebay?.salesByGrade || {};
-          for (const grade of ["psa10", "psa9", "psa8", "psa7", "psa6"]) {
-            const g = grades[grade];
-            if (g) {
-              psa[grade] = g.smartMarketPrice?.price ?? g.averagePrice ?? null;
-            }
+        const grades = pptData.data?.[0]?.ebay?.salesByGrade || {};
+        for (const grade of ["psa10", "psa9", "psa8", "psa7", "psa6"]) {
+          const g = grades[grade];
+          if (g) {
+            psa[grade] = g.smartMarketPrice?.price ?? g.averagePrice ?? null;
           }
         }
       } catch (e) {
-        psa._error = e.message || String(e);
+        // PSA lookup failed — raw prices still returned
       }
     }
 
