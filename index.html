@@ -206,7 +206,7 @@ async function openPricing(cardNum){
   if(navigator.vibrate)navigator.vibrate(12);
   overlay.classList.add("show");
   sheet.classList.add("show");
-  if(priceCache[cardNum]){const c=priceCache[cardNum];renderSheet(cardNum,c.prices,false,c.psa);return;}
+  if(priceCache[cardNum]){const c=priceCache[cardNum];const hasPsa=c.psa&&Object.keys(c.psa).length>0;if(hasPsa){renderSheet(cardNum,c.prices,false,c.psa);return;}}
   sheetBody.innerHTML=`<div class="sheet-loading">Loading prices…</div>`;
   try{
     const r=await fetch(`/.netlify/functions/card-prices?num=${cardNum}`);
