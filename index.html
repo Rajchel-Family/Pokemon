@@ -65,6 +65,8 @@
   .price-cell.grade .label{color:var(--accent)}
   .sheet-loading{padding:40px 16px;text-align:center;color:var(--dim);font-size:14px}
   .sheet-error{padding:30px 16px;text-align:center;color:var(--need);font-size:13px}
+  .sheet-reload{display:block;margin:0 16px 16px;width:calc(100% - 32px);padding:11px;background:none;border:1px solid var(--line);border-radius:10px;color:var(--dim);font-size:13px;font-weight:600;cursor:pointer}
+  .sheet-reload:active{background:var(--line)}
   .c .meta{cursor:pointer;border-top:1px solid rgba(255,203,5,.18);background:rgba(255,203,5,.04)}
   .c .meta .phint{color:var(--accent);font-size:8px;font-weight:800;float:right;padding-right:1px;opacity:.8}
 </style>
@@ -199,21 +201,21 @@ function renderSheet(cardNum,prices,error,psa){
       <div class="graded-row last">
         ${priceCell("PSA 7",psa?.psa7??null,true)}${priceCell("PSA 6",psa?.psa6??null,true)}
       </div>
-    </div>`;
+    </div>
+    <button class="sheet-reload" onclick="openPricing(${cardNum},true)">↻ Refresh prices</button>`;
 }
 
-async function openPricing(cardNum){
+async function openPricing(cardNum,force){
   if(navigator.vibrate)navigator.vibrate(12);
   overlay.classList.add("show");
   sheet.classList.add("show");
-  if(priceCache[cardNum]){const c=priceCache[cardNum];const hasPsa=c.psa&&Object.keys(c.psa).length>0;if(hasPsa){renderSheet(cardNum,c.prices,false,c.psa);return;}}
+  if(!force&&priceCache[cardNum]){const c=priceCache[cardNum];if(c.psa&&Object.keys(c.psa).length>0){renderSheet(cardNum,c.prices,false,c.psa);return;}}
   sheetBody.innerHTML=`<div class="sheet-loading">Loading prices…</div>`;
   try{
     const r=await fetch(`/.netlify/functions/card-prices?num=${cardNum}`);
     if(!r.ok)throw new Error(r.status);
     const d=await r.json();
-    const hasPsa=d.psa&&Object.keys(d.psa).some(k=>!k.startsWith("_"));
-    if(hasPsa)priceCache[cardNum]={prices:d.prices,psa:d.psa};
+    priceCache[cardNum]={prices:d.prices,psa:d.psa||{}};
     renderSheet(cardNum,d.prices,false,d.psa);
   }catch(e){
     renderSheet(cardNum,null,true);
