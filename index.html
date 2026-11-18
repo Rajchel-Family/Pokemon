@@ -212,7 +212,8 @@ async function openPricing(cardNum){
     const r=await fetch(`/.netlify/functions/card-prices?num=${cardNum}`);
     if(!r.ok)throw new Error(r.status);
     const d=await r.json();
-    priceCache[cardNum]={prices:d.prices,psa:d.psa};
+    const hasPsa=d.psa&&Object.keys(d.psa).some(k=>!k.startsWith("_"));
+    if(hasPsa)priceCache[cardNum]={prices:d.prices,psa:d.psa};
     renderSheet(cardNum,d.prices,false,d.psa);
   }catch(e){
     renderSheet(cardNum,null,true);
